@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Najciekawsze miejsca{% endblock %}</h1>
+  {% if g.user %}
+    <a class="action" href="{{ url_for('home.create') }}">Dodaj</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% for place in places %}
+    <article class="place">
+      <header>
+        <div>
+          <h1>{{ place['title'] }}</h1>
+          <div class="about">by {{ place['username'] }} on {{ place['created'].strftime('%Y-%m-%d') }}</div>
+        </div>
+        {% if g.user['id'] == place['author_id'] %}
+          <a class="action" href="{{ url_for('home.update', id=place['id']) }}">Edytuj</a>
+        {% endif %}
+      </header>
+      <p class="body">{{ place['body'] }}</p>
+    </article>
+    {% if not loop.last %}
+      <hr>
+    {% endif %}
+  {% endfor %}
+{% endblock %}

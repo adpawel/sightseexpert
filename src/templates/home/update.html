@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Edytowanie "{{ place['title'] }}"{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post" enctype="multipart/form-data">
+    <label for="title">Tytuł</label>
+    <input name="title" id="title"
+      value="{{ request.form['title'] or place['title'] }}" required>
+    
+      <label for="body">Opis</label>
+    <textarea name="body" id="body">{{ request.form['body'] or place['body'] }}</textarea>
+    
+    <label for="address">Adres miejsca</label>
+    <input name="address" id="address" value="{{ request.form['address']  or place['address']}}" required>
+
+    <label for="file">Dodaj zdjecie</label>
+    <input type="file" name="file" id="file">
+    <input type="submit" value="Save">
+  </form>
+  <hr>
+  <form action="{{ url_for('home.delete', id=place['id']) }}" method="post">
+    <input class="danger" type="submit" value="Delete" onclick="return confirm('Usunąć miejsce?');">
+  </form>
+{% endblock %}
