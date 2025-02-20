@@ -1,16 +1,82 @@
 import os
+import time
 from flask import (
     Blueprint, flash, g, redirect, render_template, request, url_for
 )
-from werkzeug.utils import secure_filename
 from werkzeug.exceptions import abort
 from src.auth import login_required
 from src.db import get_db
+from flask import send_from_directory
+
 
 bp = Blueprint('home', __name__)
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+@bp.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@bp.route('/place/filter')
+def filter():
+    author = request.args.get('username')
+    street = request.args.get('street')
+    db = get_db()
+    
+    query = '''
+        SELECT p.id, title, body, created, author_id, username, picture, address
+        FROM place p JOIN user u ON p.author_id = u.id
+    '''
+    
+    conditions = []
+    params = []
+    
+    if author:
+        conditions.append("username = ?")
+        params.append(author)
+    if street:
+        conditions.append("address LIKE ?")
+        params.append(f"%{street}%")
+    
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    
+    query += " ORDER BY created DESC"
+    
+    places = db.execute(query, params).fetchall()
+    
+    return render_template('home/index.html', places=places)
+
+
+@bp.route('/place/author')
+def get_by_author():
+    author = request.args.get('username', '')
+    db = get_db()
+    places = db.execute(
+        'SELECT p.id, title, body, created, author_id, username, picture, address'
+        ' FROM place p JOIN user u ON p.author_id = u.id'
+        ' WHERE username = ?'
+        ' ORDER BY created DESC',
+        (author,)
+    ).fetchall()
+    return render_template('home/index.html', places=places)
+
+
+@bp.route('/place/street')
+def get_by_street():
+    street = request.args.get('street', '')  
+    db = get_db()
+    places = db.execute(
+        "SELECT p.id, title, body, created, author_id, username, picture, address"
+        " FROM place p JOIN user u ON p.author_id = u.id"
+        " WHERE address LIKE ?"
+        " ORDER BY created DESC",
+        ("%"+street+"%",)  
+    ).fetchall()
+    return render_template('home/index.html', places=places)
+
 
 @bp.route('/')
 def index():
@@ -22,10 +88,17 @@ def index():
     ).fetchall()
     return render_template('home/index.html', places=places)
 
+
 def allowed_file(filename):
     """ Sprawdza, czy plik ma dozwolone rozszerzenie """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+
+def generate_filename(filename):
+    ext = os.path.splitext(filename)[1]  
+    timestamp = int(time.time())  
+    return f"{timestamp}{ext}"
 
 
 @bp.route('/create', methods=('GET', 'POST'))
@@ -45,8 +118,8 @@ def create():
             error = 'Address is required'
 
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)  # Zabezpieczenie nazwy pliku
-            picture_path = os.path.join(UPLOAD_FOLDER, filename)
+            filename = generate_filename(file.filename)  
+            picture_path = os.path.join('src', UPLOAD_FOLDER, filename)
             file.save(picture_path)
 
         if error is not None:
@@ -56,7 +129,7 @@ def create():
             db.execute(
                 'INSERT INTO place (title, body, author_id, address, picture)'
                 ' VALUES (?, ?, ?, ?, ?)',
-                (title, body, g.user['id'], address, picture_path)
+                (title, body, g.user['id'], address, filename)
             )
             db.commit()
             return redirect(url_for('home.index'))
@@ -101,10 +174,9 @@ def update(id):
             error = 'Address is required.'
             
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)  # Zabezpieczenie nazwy pliku
-            picture_path = os.path.join(UPLOAD_FOLDER, filename)
-        
-            remove_picture(place['picture'])
+            filename = generate_filename(file.filename)  
+            remove_picture(os.path.join('src', UPLOAD_FOLDER, place['picture']))
+            picture_path = os.path.join('src', UPLOAD_FOLDER, filename)
             file.save(picture_path)
 
         if error is not None:
@@ -114,7 +186,7 @@ def update(id):
             db.execute(
                 'UPDATE place SET title = ?, body = ?, address = ?, picture = ?'
                 ' WHERE id = ?',
-                (title, body, address, picture_path, id)
+                (title, body, address, filename, id)
             )
             db.commit()
             return redirect(url_for('home.index'))

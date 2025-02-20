@@ -1,28 +1,56 @@
+
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Najciekawsze miejsca{% endblock %}</h1>
+  <h1>{% block title %}Najciekawsze miejsca w Krakowie{% endblock %}</h1>
   {% if g.user %}
     <a class="action" href="{{ url_for('home.create') }}">Dodaj</a>
   {% endif %}
+
+  <form action="{{ url_for('home.filter') }}" method="get">
+    
+    <label for="username">Filtruj po użytkowniku:</label>
+    <input type="text" name="username" id="username" placeholder="Wpisz nazwę użytkownika">
+
+    <label for="street">Filtruj po ulicy:</label>
+    <input type="text" name="street" id="street" placeholder="Wpisz nazwę ulicy">
+    
+    <button type="submit">Filtruj</button>
+  </form>
+  <form action="{{ url_for('home.index') }}" method="get">
+    <button type="submit">Usuń filtry</button>
+  </form>
+
 {% endblock %}
 
 {% block content %}
   {% for place in places %}
-    <article class="place">
-      <header>
-        <div>
-          <h1>{{ place['title'] }}</h1>
-          <div class="about">by {{ place['username'] }} on {{ place['created'].strftime('%Y-%m-%d') }}</div>
+  <article class="place">
+    <header>
+      <div>
+        <h1>{{ place['title'] }}</h1>
+        <div class="about">
+          by <a href="{{ url_for('home.get_by_author', author_id=place['author_id']) }}">{{ place['username'] }}</a> 
+          on {{ place['created'].strftime('%Y-%m-%d') }}
         </div>
-        {% if g.user['id'] == place['author_id'] %}
-          <a class="action" href="{{ url_for('home.update', id=place['id']) }}">Edytuj</a>
-        {% endif %}
-      </header>
-      <p class="body">{{ place['body'] }}</p>
-    </article>
-    {% if not loop.last %}
+      </div>
+    </header>
+    
+    <div class="place-content">
+      <div class="place-text">
+        <p class="body">{{ place['body'] }}</p>
+        <p><strong>Adres:</strong> <a href="{{ url_for('home.get_by_street', street=place['address']) }}">{{ place['address'] }}</a></p>
+      </div>
+      
+      {% if place.picture %}
+        <div class="place-image">
+          <img src="{{ url_for('home.uploaded_file', filename=place['picture']) }}" alt="Zdjęcie miejsca">
+        </div>
+      {% endif %}
+    </div>
+  </article>  
+  {% if not loop.last %}
       <hr>
-    {% endif %}
+  {% endif %}
   {% endfor %}
 {% endblock %}
