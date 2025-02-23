@@ -25,19 +25,20 @@ def register():
 
         if error is None:
             try:
-                db.execute(
-                    "INSERT INTO user (username, password) VALUES (?, ?)",
-                    (username, generate_password_hash(password)),
-                )
-                db.commit()
-            except db.IntegrityError:
+                with db.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO \"user\" (username, password) VALUES (%s, %s)",
+                        (username, generate_password_hash(password)),
+                    )
+                    db.commit()
+            except db.Error:
                 error = f"User {username} is already registered."
             else:
                 return redirect(url_for("auth.login"))
 
         flash(error)
 
-    return render_template('/register.html')
+    return render_template('register.html')
 
 
 @bp.route('/login', methods=('GET', 'POST'))
@@ -47,9 +48,10 @@ def login():
         password = request.form['password']
         db = get_db()
         error = None
-        user = db.execute(
-            'SELECT * FROM user WHERE username = ?', (username,)
-        ).fetchone()
+
+        with db.cursor() as cursor:
+            cursor.execute('SELECT * FROM "user" WHERE username = %s', (username,))
+            user = cursor.fetchone()
 
         if user is None:
             error = 'Incorrect username.'
@@ -63,8 +65,8 @@ def login():
 
         flash(error)
 
-    return render_template('/login.html')
-
+    return render_template('login.html')
+        
 
 @bp.before_app_request
 def load_logged_in_user():
@@ -73,10 +75,11 @@ def load_logged_in_user():
     if user_id is None:
         g.user = None
     else:
-        g.user = get_db().execute(
-            'SELECT * FROM user WHERE id = ?', (user_id,)
-        ).fetchone()
-        
+        db = get_db()
+        with db.cursor() as cursor:
+            cursor.execute('SELECT * FROM "user" WHERE id = %s', (user_id,))
+            g.user = cursor.fetchone()
+
 
 @bp.route('/logout')
 def logout():
