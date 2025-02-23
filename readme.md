@@ -1,6 +1,6 @@
 # Sightseexpert (in progress)
 
-Sightseexpert is a simple web application that allows logged-in users to post interesting places in Krakow, along with their pictures and details. This project is built using Python, Flask, PostgreSQL, AWS, and API integration.
+Sightseexpert is a simple web application (focused mostly on backend) that allows logged-in users to post interesting places in Krakow, along with their pictures and details. This project is built using Python, Flask, PostgreSQL, AWS, and API integration.
 
 ### Live Demo:
 You can view the live version of the application here: [Sightseexpert on Render](https://sightseexpert.onrender.com/)
