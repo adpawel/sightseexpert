@@ -1,4 +1,3 @@
-
 {% extends 'base.html' %}
 
 {% block header %}
@@ -35,7 +34,7 @@
         </div>
       </div>
       {% if g.user['id'] == place['author_id'] %}
-        <a class="action" href="{{ url_for('home.update', id=place['id']) }}">Edit</a>
+        <a class="action" href="{{ url_for('home.update', id=place['id']) }}">Edytuj</a>
       {% endif %}
     </header>
     
@@ -45,9 +44,10 @@
         <p><strong>Adres:</strong> <a href="{{ url_for('home.get_by_street', street=place['address']) }}">{{ place['address'] }}</a></p>
       </div>
       
-      {% if place.picture %}
+      {% if place['picture'] %}
         <div class="place-image">
-          <img src="{{ url_for('home.uploaded_file', filename=place['picture']) }}" alt="Zdjęcie miejsca">
+          <!-- Wyświetlanie zdjęcia -->
+          <img src="{{ place['picture'] }}" alt="Zdjęcie miejsca">
         </div>
       {% endif %}
     </div>

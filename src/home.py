@@ -2,6 +2,7 @@ import os
 import time
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for, send_from_directory
 from werkzeug.exceptions import abort
+from werkzeug.utils import secure_filename
 from src.auth import login_required
 from src.db import get_db
 
@@ -109,6 +110,7 @@ def generate_filename(filename):
     timestamp = int(time.time())
     return f"{timestamp}{ext}"
 
+
 @bp.route('/create', methods=('GET', 'POST'))
 @login_required
 def create():
@@ -118,7 +120,7 @@ def create():
         address = request.form['address']
         file = request.files['file']
         error = None
-        picture_path = None
+        picture_url = None
 
         if not title:
             error = 'Title is required.'
@@ -126,9 +128,7 @@ def create():
             error = 'Address is required'
 
         if file and allowed_file(file.filename):
-            filename = generate_filename(file.filename)
-            picture_path = os.path.join('src', UPLOAD_FOLDER, filename)
-            file.save(picture_path)
+            picture_url = upload_file_to_s3(file) 
 
         if error is not None:
             flash(error)
@@ -140,12 +140,13 @@ def create():
                     INSERT INTO place (title, body, author_id, address, picture)
                     VALUES (%s, %s, %s, %s, %s)
                     ''',
-                    (title, body, g.user['id'], address, filename)
+                    (title, body, g.user['id'], address, picture_url)
                 )
                 db.commit()
             return redirect(url_for('home.index'))
 
     return render_template('home/create.html')
+
 
 def get_place(id, check_author=True):
     db = get_db()
@@ -177,25 +178,22 @@ def update(id):
         title = request.form['title']
         body = request.form['body']
         address = request.form['address']
-        file = request.files['file'] #or place['picture']
+        file = request.files['file']
         error = None
-        picture_path = None
+        picture_url = place['picture']  # Domyślnie przypisujemy aktualny obrazek, jeśli nie zostanie wgrany nowy.
 
+        # Sprawdzenie wymaganych pól
         if not title:
             error = 'Title is required.'
-
-        if not address:
+        elif not address:
             error = 'Address is required.'
-            
-        # poprawic    
-        if not file:
-            error = 'File is required'
 
-        if file and allowed_file(file.filename):
-            filename = generate_filename(file.filename)
-            remove_picture(os.path.join('src', UPLOAD_FOLDER, place['picture']))
-            picture_path = os.path.join('src', UPLOAD_FOLDER, filename)
-            file.save(picture_path)
+        # Jeśli plik został przesłany
+        if file:
+            if allowed_file(file.filename):  # Sprawdzenie czy plik ma odpowiedni typ
+                picture_url = upload_file_to_s3(file)  # Funkcja do uploadu na S3
+            else:
+                error = 'Invalid file format.'
 
         if error is not None:
             flash(error)
@@ -207,12 +205,14 @@ def update(id):
                     UPDATE place SET title = %s, body = %s, address = %s, picture = %s
                     WHERE id = %s
                     ''',
-                    (title, body, address, filename, id)
+                    (title, body, address, picture_url, id)
                 )
                 db.commit()
+
             return redirect(url_for('home.index'))
 
     return render_template('home/update.html', place=place)
+
 
 @bp.route('/<int:id>/delete', methods=('POST',))
 @login_required
@@ -232,3 +232,37 @@ def delete(id):
 def remove_picture(picture_path):
     if os.path.exists(picture_path):
         os.remove(picture_path)
+
+
+
+import boto3
+import os
+
+# Ustawienia AWS
+S3_BUCKET = 'sightseexpertbucket'
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_REGION = 'eu-north-1'
+
+# Połączenie z S3
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_REGION
+)
+
+def upload_file_to_s3(file):
+    filename = secure_filename(file.filename)
+    try:
+        s3_client.upload_fileobj(
+            file,
+            S3_BUCKET,
+            filename,
+            ExtraArgs={'ContentType': file.content_type, 'ACL': 'public-read'}
+        )
+        file_url = f'https://{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{filename}'
+        return file_url
+    except Exception as e:
+        print(f"Coś poszło nie tak: {e}")
+        return None
